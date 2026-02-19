@@ -25,6 +25,8 @@ from vllm.utils.system_utils import get_mp_context
 from vllm.v1.engine.coordinator import DPCoordinator
 from vllm.v1.executor import Executor
 from vllm.v1.utils import get_engine_client_zmq_addr, shutdown
+from vllm.v1.engine.ompmultiprocessing import OMPProcessManager
+from vllm.v1.executor.uniproc_executor import UniProcExecutor
 
 if TYPE_CHECKING:
     from ray.util.placement_group import PlacementGroup
@@ -110,23 +112,38 @@ class CoreEngineProcManager:
 
         self.processes: list[BaseProcess] = []
         local_dp_ranks = []
+        om = OMPProcessManager()
         for index in range(local_engine_count):
             local_index = local_start_index + index
             global_index = start_index + index
 
             # Start EngineCore in background process.
             local_dp_ranks.append(local_index)
-            self.processes.append(
-                context.Process(
-                    target=target_fn,
-                    name=f"EngineCore_DP{global_index}",
-                    kwargs=common_kwargs
-                    | {
-                        "dp_rank": global_index,
-                        "local_dp_rank": local_index,
-                    },
+            if executor_class == UniProcExecutor:
+                self.processes.append(
+                    om.run(
+                        context.Process,
+                        target=target_fn,
+                        name=f"EngineCore_DP{global_index}",
+                        kwargs=common_kwargs
+                        | {
+                            "dp_rank": global_index,
+                            "local_dp_rank": local_index,
+                        },
+                    )
                 )
-            )
+            else:
+                self.processes.append(
+                    context.Process(
+                        target=target_fn,
+                        name=f"EngineCore_DP{global_index}",
+                        kwargs=common_kwargs
+                        | {
+                            "dp_rank": global_index,
+                            "local_dp_rank": local_index,
+                        },
+                    )
+                )
 
         self._finalizer = weakref.finalize(self, shutdown, self.processes)
 

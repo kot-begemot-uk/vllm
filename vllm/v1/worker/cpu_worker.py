@@ -54,17 +54,12 @@ class CPUWorker(Worker):
     def init_device(self):
         # Setup OpenMP threads affinity.
         omp_cpuids = envs.VLLM_CPU_OMP_THREADS_BIND
+        cpu_arch = current_platform.get_cpu_architecture()
         if omp_cpuids == "auto" and platform.system() == "Linux":
-            cpu_arch = current_platform.get_cpu_architecture()
             if cpu_arch in (CpuArchEnum.POWERPC, CpuArchEnum.S390X):
                 # For S390X/POWERPC SMT-8/4/2
                 self.local_omp_cpuid = self._get_autobind_cpu_ids(
                     lambda cpus: [cpu for cpu in cpus if cpu.id % 8 < 4]
-                )
-            elif cpu_arch == CpuArchEnum.X86:
-                # For x86 SMT-2, use 1 CPU per core
-                self.local_omp_cpuid = self._get_autobind_cpu_ids(
-                    lambda cpus: cpus[-1:]
                 )
             else:
                 self.local_omp_cpuid = "nobind"
@@ -79,6 +74,9 @@ class CPUWorker(Worker):
                     local_dp_rank * world_size : (local_dp_rank + 1) * world_size
                 ]
             self.local_omp_cpuid = omp_cpuids_list[self.rank]
+
+        if cpu_arch == CpuArchEnum.X86 and platform.system() == "Linux":
+            self.local_omp_cpuid = "nobind"
 
         if self.local_omp_cpuid != "nobind":
             ret = torch.ops._C_utils.init_cpu_threads_env(self.local_omp_cpuid)

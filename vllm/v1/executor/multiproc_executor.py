@@ -56,6 +56,7 @@ from vllm.v1.core.sched.output import GrammarOutput, SchedulerOutput
 from vllm.v1.executor.abstract import Executor, FailureCallback
 from vllm.v1.outputs import AsyncModelRunnerOutput, DraftTokenIds, ModelRunnerOutput
 from vllm.v1.worker.worker_base import WorkerWrapperBase
+from vllm.v1.engine.ompmultiprocessing import OMPProcessManager
 
 logger = init_logger(__name__)
 
@@ -152,16 +153,18 @@ class MultiprocExecutor(Executor):
             global_start_rank = (
                 self.local_world_size * self.parallel_config.node_rank_within_dp
             )
+            om = OMPProcessManager()
+
             for local_rank in range(self.local_world_size):
                 global_rank = global_start_rank + local_rank
                 unready_workers.append(
-                    WorkerProc.make_worker_process(
-                        vllm_config=self.vllm_config,
-                        local_rank=local_rank,
-                        rank=global_rank,
-                        distributed_init_method=distributed_init_method,
-                        input_shm_handle=scheduler_output_handle,
-                        shared_worker_lock=shared_worker_lock,
+                    om.run(WorkerProc.make_worker_process,
+                       vllm_config=self.vllm_config,
+                       local_rank=local_rank,
+                       rank=global_rank,
+                       distributed_init_method=distributed_init_method,
+                       input_shm_handle=scheduler_output_handle,
+                       shared_worker_lock=shared_worker_lock,
                     )
                 )
 
