@@ -101,7 +101,7 @@ class OMPProcessManager():
     def __init__(self, strategy="nodes", smt=False):
         self.strategy = strategy
         self.smt = smt
-
+        omp_places = []
         vllm_mask = os.environ.get("VLLM_CPU_OMP_THREADS_BIND", None)
         self.setup_omp = vllm_mask != "nobind"
         if self.setup_omp and len(OMPProcessManager.omp_places) == 0:
@@ -113,8 +113,10 @@ class OMPProcessManager():
                 masks = [None]
             for mask in masks:
                 resources = enumerate_resources(mask)
-                OMPProcessManager.omp_places.extend(
+                omp_places.extend(
                     create_omp_places(resources, strategy, smt))
+            OMPProcessManager.omp_places = sorted(
+                omp_places, key=lambda p: len(p["mask"]), reverse=True)
 
     def run(self, what, *args, **kwargs):
         '''Run arg with correct OMP environment'''
