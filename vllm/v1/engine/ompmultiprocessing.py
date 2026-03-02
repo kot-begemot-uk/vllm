@@ -22,15 +22,14 @@ def parse_mask(mask):
     return set(result)
 
 
-
-def enumerate_resources(mask=None):
+def enumerate_resources(resource_map, mask=None, allowed=None):
     '''Enumerate system resources'''
-    allowed = os.sched_getaffinity(0)
+    if allowed is None:
+        allowed = os.sched_getaffinity(0)
     if mask is not None:
         allowed = allowed & mask
     lscpu = {"cpus":{}, "cores":{}, "nodes":{}}
-    for cpu in json.loads(subprocess.run(["lscpu", "-Je"], check=True,
-                          capture_output=True).stdout)["cpus"]:
+    for cpu in resource_map["cpus"]:
         if cpu["cpu"] in allowed:
             lscpu["cpus"][cpu["cpu"]] = [cpu]
             core = int(cpu["core"])
@@ -111,8 +110,11 @@ class OMPProcessManager():
                     masks.append(parse_mask(spec))
             else:
                 masks = [None]
+            lscpu = json.loads(subprocess.run(
+                               ["lscpu", "-Je"], check=True,
+                               capture_output=True).stdout)
             for mask in masks:
-                resources = enumerate_resources(mask)
+                resources = enumerate_resources(lscpu, mask)
                 omp_places.extend(
                     create_omp_places(resources, strategy, smt))
             OMPProcessManager.omp_places = sorted(

@@ -113,6 +113,7 @@ class CoreEngineProcManager:
         self.processes: list[BaseProcess] = []
         local_dp_ranks = []
         om = OMPProcessManager()
+        logger.info(f"Configured OMP PLACES {om.omp_places}")
         for index in range(local_engine_count):
             local_index = local_start_index + index
             global_index = start_index + index

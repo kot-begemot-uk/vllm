@@ -154,6 +154,7 @@ class MultiprocExecutor(Executor):
                 self.local_world_size * self.parallel_config.node_rank_within_dp
             )
             om = OMPProcessManager()
+            logger.info(f"Configured OMP PLACES {om.omp_places}")
 
             for local_rank in range(self.local_world_size):
                 global_rank = global_start_rank + local_rank
