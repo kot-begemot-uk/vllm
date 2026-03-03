@@ -122,9 +122,6 @@ class MultiprocExecutor(Executor):
             f"_parallel_size ({pcp_size}). "
         )
 
-        # Set multiprocessing envs
-        set_multiprocessing_worker_envs()
-
         # use the loopback address get_loopback_ip() for communication.
         distributed_init_method = get_distributed_init_method(
             get_loopback_ip(), get_open_port()
@@ -861,32 +858,3 @@ class WorkerProc:
             process_name += f"_EP{ep_rank}"
         set_process_title(name=process_name)
         decorate_logs(process_name)
-
-
-def set_multiprocessing_worker_envs():
-    """Set up environment variables that should be used when there are workers
-    in a multiprocessing environment. This should be called by the parent
-    process before worker processes are created"""
-
-    _maybe_force_spawn()
-
-    # Configure thread parallelism if OMP_NUM_THREADS isn't set
-    #
-    # Helps to avoid CPU contention. The default of spawning a thread per
-    # core combined with multiprocessing for each GPU can have a negative
-    # impact on performance. The contention is amplified when running in a
-    # container where CPU limits can cause throttling.
-    default_omp_num_threads = 1
-    if (
-        "OMP_NUM_THREADS" not in os.environ
-        and (current_parallelism := torch.get_num_threads()) > default_omp_num_threads
-    ):
-        logger.warning(
-            "Reducing Torch parallelism from %d threads to %d to avoid "
-            "unnecessary CPU contention. Set OMP_NUM_THREADS in the "
-            "external environment to tune this value as needed.",
-            current_parallelism,
-            default_omp_num_threads,
-        )
-        os.environ["OMP_NUM_THREADS"] = str(default_omp_num_threads)
-        torch.set_num_threads(default_omp_num_threads)

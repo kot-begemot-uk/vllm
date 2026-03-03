@@ -96,41 +96,42 @@ def create_omp_places(resources, strategy, smt=True):
 # pylint: disable=too-few-public-methods
 class OMPProcessManager():
     '''OMP aware wrapper to run mp Process()'''
-    omp_places = []
-    def __init__(self, strategy="nodes", smt=False):
+    def __init__(self, strategy="nodes", smt=False, mock=None, affinity=None):
         self.strategy = strategy
         self.smt = smt
-        omp_places = []
+        self.omp_places = []
         vllm_mask = os.environ.get("VLLM_CPU_OMP_THREADS_BIND", None)
         self.setup_omp = vllm_mask != "nobind"
-        if self.setup_omp and len(OMPProcessManager.omp_places) == 0:
+        if self.setup_omp:
+            omp_places = []
             if vllm_mask is not None:
                 masks = []
                 for spec in vllm_mask.split("|"):
                     masks.append(parse_mask(spec))
             else:
                 masks = [None]
-            lscpu = json.loads(subprocess.run(
-                               ["lscpu", "-Je"], check=True,
-                               capture_output=True).stdout)
+            if mock is None:
+                data = subprocess.run(["lscpu", "-Je"], check=True,
+                                      capture_output=True).stdout
+            else:
+                data = open(mock, mode="r", encoding="ascii").read()
+            lscpu = json.loads(data)
             for mask in masks:
-                resources = enumerate_resources(lscpu, mask)
+                resources = enumerate_resources(lscpu, mask, affinity)
                 omp_places.extend(
                     create_omp_places(resources, strategy, smt))
-            OMPProcessManager.omp_places = sorted(
+            self.omp_places = sorted(
                 omp_places, key=lambda p: len(p["mask"]), reverse=True)
 
     def run(self, what, *args, **kwargs):
         '''Run arg with correct OMP environment'''
         if self.setup_omp:
-            for place in OMPProcessManager.omp_places:
+            for place in self.omp_places:
                 if place["available"]:
                     place["available"] = False
                     # pylint: disable=consider-using-f-string
                     os.environ["OMP_PLACES"] = "{}".format(place["mask"])
-                    if os.environ.get("OMP_NUM_THREADS", None) is None:
-                        # pylint: disable=consider-using-f-string
-                        os.environ["OMP_NUM_THREADS"] = "{}".format(len(place["mask"]))
+                    os.environ["OMP_NUM_THREADS"] = "{}".format(len(place["mask"]))
                     os.environ["OMP_PROC_BIND"] = "TRUE"
                     return what(*args, **kwargs)
             raise IndexError("Out of OMP places")
