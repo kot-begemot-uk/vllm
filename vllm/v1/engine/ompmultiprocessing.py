@@ -30,8 +30,9 @@ def enumerate_resources(resource_map, mask=None, allowed=None):
         allowed = allowed & mask
     lscpu = {"cpus":{}, "cores":{}, "nodes":{}}
     for cpu in resource_map["cpus"]:
-        if cpu["cpu"] in allowed:
-            lscpu["cpus"][cpu["cpu"]] = [cpu]
+        cpunum = int(cpu["cpu"])
+        if cpunum in allowed:
+            lscpu["cpus"][cpunum] = [cpu]
             core = int(cpu["core"])
             if lscpu["cores"].get(core, None) is None:
                 lscpu["cores"][core] = [cpu]
