@@ -56,7 +56,7 @@ def produce_cpu_list(cpus, smt=True):
                     exists = True
                     break
         if not exists:
-            mask.append(key)
+            mask.append(int(key))
     return {"mask":set(mask), "available": True}
 
 def produce_cpu_sublist(scpus, smt=True):
@@ -66,14 +66,14 @@ def produce_cpu_sublist(scpus, smt=True):
         exists = False
         if not smt:
             for cpu in cpu_list:
-                if cpu["core"] == value["core"]:
+                if int(cpu["core"]) == int(value["core"]):
                     exists = True
                     break
         if not exists:
             cpu_list.append(value)
     mask = []
     for cpu in cpu_list:
-        mask.append(cpu["cpu"])
+        mask.append(int(cpu["cpu"]))
 
     return {"mask":set(mask), "available": True}
 
