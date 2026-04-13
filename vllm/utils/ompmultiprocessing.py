@@ -201,6 +201,37 @@ class OMPProcessManager:
                         {"mask": set(sorted(cpulist)), "available": True}
                     )
 
+    def _detect_locality_key(self):
+        """Detect the best locality grouping key from lscpu data.
+
+        On most systems, NUMA "node" provides the right grouping. But on
+        architectures like S390X (books) or ARM (clusters), all CPUs may
+        report a single NUMA node while having finer-grained locality
+        boundaries. When that's the case, use the finer field instead.
+        """
+        cpus = self.lscpu.get("cpus", [])
+        if not cpus:
+            return "node"
+
+        # Check if there's more than one NUMA node — if so, node is fine
+        nodes = set()
+        for cpu in cpus:
+            nodes.add(_int(cpu.get("node", 0)))
+        if len(nodes) > 1:
+            return "node"
+
+        # Single NUMA node — look for finer-grained locality fields.
+        # Prefer "book" (S390X), then "cluster" (ARM).
+        for field in ("book", "cluster"):
+            values = set()
+            for cpu in cpus:
+                if field in cpu:
+                    values.add(_int(cpu[field]))
+            if len(values) > 1:
+                return field
+
+        return "node"
+
     def enumerate_resources(self, allowed):
         """Enumerate system resources"""
 
@@ -208,6 +239,8 @@ class OMPProcessManager:
             allowed_nodes = parse_mask(os.environ["CPU_VISIBLE_MEMORY_NODES"])
         except KeyError:
             allowed_nodes = None
+
+        group_key = self._detect_locality_key()
 
         self.cores = {}
         self.nodes = {}
@@ -225,11 +258,11 @@ class OMPProcessManager:
                 else:
                     self.cores[core].append(cpu)
 
-                node = _int(cpu["node"])
-                if self.nodes.get(node, None) is None:
-                    self.nodes[node] = set([core])
+                group = _int(cpu.get(group_key, cpu["node"]))
+                if self.nodes.get(group, None) is None:
+                    self.nodes[group] = set([core])
                 else:
-                    self.nodes[node] |= set([core])
+                    self.nodes[group] |= set([core])
 
     def compute_cpus(self):
         """How many compute CPUs are available"""
