@@ -59,7 +59,7 @@ class TestS390XBookTopology:
 
 class TestMultiNumaUnchanged:
     """When lscpu already reports multiple NUMA nodes, the grouping
-    should use node (not book/cluster) — existing behavior preserved.
+    should use node (not book) — existing behavior preserved.
     """
 
     def test_groups_by_node(self):
