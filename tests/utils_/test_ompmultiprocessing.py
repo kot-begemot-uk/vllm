@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Tests for OMP-aware multiprocessing manager.
 
 Validates that the OMPProcessManager correctly detects CPU topology
 and generates appropriate OMP_PLACES for different architectures.
 """
 
-import os
 from pathlib import Path
 
 from vllm.utils.ompmultiprocessing import OMPProcessManager, OMPStrategy
@@ -37,7 +37,7 @@ class TestS390XBookTopology:
         all_cpus = set(range(0, 50, 2))
         om = OMPProcessManager(mock=mock_file, affinity=all_cpus)
 
-        seen = set()
+        seen: set[int] = set()
         for place in om.omp_places:
             overlap = seen & place["mask"]
             assert not overlap, f"Overlapping CPUs in OMP_PLACES: {overlap}"
@@ -59,7 +59,7 @@ class TestS390XBookTopology:
 
 class TestMultiNumaUnchanged:
     """When lscpu already reports multiple NUMA nodes, the grouping
-    should use node (not book/cluster) — existing behavior preserved.
+    should use node (not book) — existing behavior preserved.
     """
 
     def test_groups_by_node(self):
@@ -91,9 +91,7 @@ class TestS390XWithStrategy:
         mock_file = str(MOCK_DIR / "mock_lscpu_s390x.json")
         all_cpus = set(range(0, 50, 2))
         strategy = OMPStrategy(merge=2)
-        om = OMPProcessManager(
-            mock=mock_file, affinity=all_cpus, strategy=strategy
-        )
+        om = OMPProcessManager(mock=mock_file, affinity=all_cpus, strategy=strategy)
 
         assert len(om.omp_places) == 2, (
             f"Expected 2 OMP_PLACES after merging pairs of books, "
@@ -105,13 +103,10 @@ class TestS390XWithStrategy:
         mock_file = str(MOCK_DIR / "mock_lscpu_s390x.json")
         all_cpus = set(range(0, 50, 2))
         strategy = OMPStrategy(reserve=1)
-        om = OMPProcessManager(
-            mock=mock_file, affinity=all_cpus, strategy=strategy
-        )
+        om = OMPProcessManager(mock=mock_file, affinity=all_cpus, strategy=strategy)
 
         compute = om.compute_cpus()
         total = om.total_cpus()
         assert compute == total - 4, (
-            f"Expected {total - 4} compute CPUs (1 reserved per book), "
-            f"got {compute}"
+            f"Expected {total - 4} compute CPUs (1 reserved per book), got {compute}"
         )

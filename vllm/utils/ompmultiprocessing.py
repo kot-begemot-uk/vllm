@@ -205,9 +205,9 @@ class OMPProcessManager:
         """Detect the best locality grouping key from lscpu data.
 
         On most systems, NUMA "node" provides the right grouping. But on
-        architectures like S390X (books) or ARM (clusters), all CPUs may
-        report a single NUMA node while having finer-grained locality
-        boundaries. When that's the case, use the finer field instead.
+        S390X, all CPUs may report a single NUMA node while having
+        finer-grained locality boundaries via "book". When that's the
+        case, use the book field instead.
         """
         cpus = self.lscpu.get("cpus", [])
         if not cpus:
@@ -220,15 +220,13 @@ class OMPProcessManager:
         if len(nodes) > 1:
             return "node"
 
-        # Single NUMA node — look for finer-grained locality fields.
-        # Prefer "book" (S390X), then "cluster" (ARM).
-        for field in ("book", "cluster"):
-            values = set()
-            for cpu in cpus:
-                if field in cpu:
-                    values.add(_int(cpu[field]))
-            if len(values) > 1:
-                return field
+        # Single NUMA node — check for S390X book-based topology
+        books = set()
+        for cpu in cpus:
+            if "book" in cpu:
+                books.add(_int(cpu["book"]))
+        if len(books) > 1:
+            return "book"
 
         return "node"
 
