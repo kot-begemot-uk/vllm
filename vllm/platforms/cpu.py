@@ -331,6 +331,21 @@ class CpuPlatform(Platform):
                 * vllm_config.parallel_config._api_process_count
             )
 
+        if os.environ.get("VLLM_CPU_NUM_OF_RESERVED_CPU", None) is None:
+            om = cls.get_omp_manager()
+            # reserve at least 2% of CPUs for the control plane
+            if len(om.omp_places) > 0 and om.total_cpus() > 0:
+                ratio = om.compute_cpus() / om.total_cpus()
+                if ratio > 0.975:
+                    reservation = int(0.025 * om.total_cpus() / len(om.omp_places))
+                    if reservation > 0:
+                        logger.info(
+                            "Not enough resource available for vllm"
+                            "control plane, reserving %d",
+                            reservation,
+                        )
+                        os.environ["VLLM_CPU_NUM_OF_RESERVED_CPU"] = f"{reservation}"
+
     @classmethod
     def update_block_size_for_backend(cls, vllm_config: "VllmConfig") -> None:
         # TODO: CPU still sets block_size in check_and_update_config.
@@ -361,14 +376,6 @@ class CpuPlatform(Platform):
                     cls.omp_process_manager.compute_cpus(),
                     cls.omp_process_manager.total_cpus(),
                 )
-                if (
-                    cls.omp_process_manager.total_cpus()
-                    == cls.omp_process_manager.compute_cpus()
-                ):
-                    logger.info(
-                        "No resource available for vllm control plane,"
-                        " consider reserving some cores"
-                    )
 
         return cls.omp_process_manager
 
