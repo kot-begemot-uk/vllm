@@ -363,7 +363,10 @@ class CpuPlatform(Platform):
                 merge=int(os.environ.get("VLLM_CPU_MERGE_NUMA_NODES", 1)),
             )
 
-            if cls.get_cpu_architecture() == CpuArchEnum.POWERPC:
+            if (
+                cls.get_cpu_architecture() == CpuArchEnum.POWERPC
+                or cls.get_cpu_architecture() == CpuArchEnum.S390X
+            ):
                 omp_strategy.smt = 4
 
             cls.omp_process_manager = OMPProcessManager(
